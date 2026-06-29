@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import crypto from "node:crypto";
-import { sql } from "kysely";
 import { auth } from "@/lib/auth";
 import { db, ensureMigrations, getUserClicks, adjustUserClicks } from "@/lib/db";
 import { saveUpload } from "@/lib/uploads";
@@ -169,6 +168,3 @@ export async function POST(req: NextRequest) {
     balance: newBalance,
   });
 }
-
-// suppress unused import (sql kept for future migrations)
-export const _unused = sql;
