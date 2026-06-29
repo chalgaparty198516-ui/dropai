@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import { Kysely, PostgresDialect, SqliteDialect, sql } from "kysely";
 import { Pool } from "pg";
 import path from "node:path";
@@ -79,7 +79,11 @@ function ensureDrivers(): { kysely: Kysely<Tables> } {
     }
   } else {
     if (!global.__dropaiSqlite) {
-      global.__dropaiSqlite = new Database(dbPath);
+      // Lazy require — на Vercel native-модуль better-sqlite3 может не собраться,
+      // а в prod мы его всё равно не используем (там Postgres).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const BetterSqlite3: typeof import("better-sqlite3") = require("better-sqlite3");
+      global.__dropaiSqlite = new BetterSqlite3(dbPath);
     }
     if (!global.__dropaiKysely) {
       global.__dropaiKysely = new Kysely<Tables>({
