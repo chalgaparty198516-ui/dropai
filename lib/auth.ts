@@ -10,9 +10,7 @@ import { getPgPool, getSqlite, IS_POSTGRES } from "./db";
  *   npx @better-auth/cli@latest migrate
  * (создаст user/session/account/verification под Postgres).
  */
-const database = IS_POSTGRES
-  ? { db: getPgPool(), type: "postgres" as const }
-  : getSqlite()!;
+const database = IS_POSTGRES ? getPgPool()! : getSqlite()!;
 
 export const auth = betterAuth({
   database,
