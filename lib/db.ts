@@ -4,7 +4,15 @@ import { Pool } from "pg";
 import path from "node:path";
 
 const dbPath = process.env.DROPAI_DB_PATH ?? path.join(process.cwd(), "dropai.db");
-const DATABASE_URL = process.env.DATABASE_URL;
+// Поддерживаем несколько имён переменных: своё DATABASE_URL и автоматические от
+// Vercel-Neon-интеграции (POSTGRES_URL, POSTGRES_PRISMA_URL).
+const DATABASE_URL =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.DATABASE_URL_UNPOOLED ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  "";
 export const IS_POSTGRES = Boolean(DATABASE_URL);
 
 /**
