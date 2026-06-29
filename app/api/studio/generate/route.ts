@@ -9,7 +9,8 @@ import { generate, enhancePrompt, pickProvider, COSTS, MAX_VARIANTS } from "@/li
 import { getQualityPreset } from "@/lib/quality";
 
 export const runtime = "nodejs";
-export const maxDuration = 180;
+// Vercel Hobby tier limit. Если апгрейднешься на Pro — можно поднять до 300.
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   await ensureMigrations();

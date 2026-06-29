@@ -74,7 +74,7 @@ export function StudioEditor({
   const [preview, setPreview] = useState<string | null>(null);
   const [styleId, setStyleId] = useState<string>(DEFAULT_STYLE_ID);
   const [prompt, setPrompt] = useState("");
-  const [variants, setVariants] = useState<number>(3);
+  const [variants, setVariants] = useState<number>(1);
   const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY);
   const [describing, setDescribing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -134,9 +134,24 @@ export function StudioEditor({
       fd.append("variants", String(variants));
       fd.append("quality", quality);
       const res = await fetch("/api/studio/generate", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка генерации");
-      setResult(data as Result);
+      const raw = await res.text();
+      if (!raw) {
+        throw new Error(
+          res.status === 504 || res.status === 502
+            ? "Сервер не уложился в лимит времени (60 сек на Vercel Hobby). Попробуйте 1 вариант или Эконом-качество."
+            : `Пустой ответ от сервера (HTTP ${res.status}). Попробуйте ещё раз.`
+        );
+      }
+      let data: Result & { error?: string };
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          `Сервер вернул не-JSON (HTTP ${res.status}). ${raw.slice(0, 120)}`
+        );
+      }
+      if (!res.ok) throw new Error(data.error || `Ошибка генерации (HTTP ${res.status})`);
+      setResult(data);
       setChosenVariant(0);
       setBalance(data.balance);
     } catch (e) {
@@ -162,8 +177,21 @@ export function StudioEditor({
       const fd = new FormData();
       fd.append("image", file);
       const res = await fetch("/api/studio/describe", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Не удалось получить описание");
+      const raw = await res.text();
+      if (!raw) {
+        throw new Error(
+          res.status === 504 || res.status === 502
+            ? "Gemini не ответил вовремя. Попробуй ещё раз."
+            : `Пустой ответ (HTTP ${res.status})`
+        );
+      }
+      let data: { description?: string; error?: string };
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(`Сервер вернул не-JSON (HTTP ${res.status}). ${raw.slice(0, 120)}`);
+      }
+      if (!res.ok) throw new Error(data.error || `Не удалось получить описание (HTTP ${res.status})`);
       if (data.description) setPrompt(String(data.description).slice(0, 500));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Что-то пошло не так");
