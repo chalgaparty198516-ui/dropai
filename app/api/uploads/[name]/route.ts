@@ -4,7 +4,10 @@ export const runtime = "nodejs";
 
 /**
  * Прокси для приватного Vercel Blob.
- * Принимает /api/uploads/{filename} → находит blob с этим pathname → стримит клиенту.
+ * /api/uploads/{filename} → находим blob, фетчим, стримим клиенту.
+ *
+ * Сначала пробуем head(pathname) — для большинства случаев у нас точное имя.
+ * Если head не нашёл — fallback на list({prefix}).
  */
 export async function GET(
   _req: NextRequest,
@@ -19,20 +22,47 @@ export async function GET(
   }
 
   try {
-    const { list } = await import("@vercel/blob");
-    // Ищем blob по prefix=filename (для приватных URL не угадаешь без list).
-    const { blobs } = await list({ prefix: filename, limit: 5 });
-    const match = blobs.find((b) => b.pathname === filename);
-    if (!match) return new Response("not found", { status: 404 });
+    const blob = await import("@vercel/blob");
 
-    const upstream = await fetch(match.url);
+    let url: string | null = null;
+    let contentType: string | null = null;
+
+    // Способ 1: head() по точному имени
+    try {
+      const h = await blob.head(filename);
+      url = ("downloadUrl" in h && typeof h.downloadUrl === "string" && h.downloadUrl) || h.url;
+      contentType = h.contentType ?? null;
+    } catch {
+      /* fallback */
+    }
+
+    // Способ 2: list по префиксу
+    if (!url) {
+      const { blobs } = await blob.list({ prefix: filename, limit: 10 });
+      const match = blobs.find((b) => b.pathname === filename) ?? blobs[0];
+      if (match) {
+        url = ("downloadUrl" in match && typeof (match as { downloadUrl?: string }).downloadUrl === "string"
+          ? (match as { downloadUrl: string }).downloadUrl
+          : match.url);
+      }
+    }
+
+    if (!url) return new Response("not found", { status: 404 });
+
+    const upstream = await fetch(url, {
+      headers: { authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` },
+    });
     if (!upstream.ok || !upstream.body) {
-      return new Response("upstream error", { status: 502 });
+      const t = await upstream.text().catch(() => "");
+      return new Response(
+        `upstream ${upstream.status} from blob: ${t.slice(0, 200)}`,
+        { status: 502 }
+      );
     }
     return new Response(upstream.body, {
       status: 200,
       headers: {
-        "content-type": match.contentType ?? "application/octet-stream",
+        "content-type": upstream.headers.get("content-type") || contentType || "application/octet-stream",
         "cache-control": "public, max-age=31536000, immutable",
       },
     });
