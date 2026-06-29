@@ -1,0 +1,26 @@
+services:
+  drop-ai:
+    build: .
+    image: drop-ai:latest
+    container_name: drop-ai
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - DROPAI_DB_PATH=/data/dropai.db
+    volumes:
+      - dropai_data:/data
+      - dropai_uploads:/app/public/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  dropai_data:
+  dropai_uploads:

@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+.env*
+!.env.example
+.DS_Store
+*.log
+# Локальный SQLite (на проде Postgres через DATABASE_URL)
+dropai.db
+dropai.db-*
+# Локально загруженные фото и сгенерированные карточки (на проде Vercel Blob)
+public/uploads/*
+!public/uploads/.gitkeep
+# Временные файлы анализа klikai.pro
+tmp_klikai
+# Vercel
+.vercel

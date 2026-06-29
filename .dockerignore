@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+dropai.db
+public/uploads/*
+!public/uploads/.gitkeep
+.DS_Store
+*.log
+README.md
+DEPLOY.md
+tmp_klikai
