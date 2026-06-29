@@ -3,11 +3,10 @@ import path from "node:path";
 
 /**
  * Дуальное хранилище:
- * - prod (есть BLOB_READ_WRITE_TOKEN): @vercel/blob
- * - dev:  локальная FS в /public/uploads
- *
- * USE_BLOB и IS_VERCEL читаем в момент вызова — env Vercel может меняться
- * между cold-старт-инвокациями функций.
+ * - prod (есть BLOB_READ_WRITE_TOKEN): @vercel/blob (private store), отдаём
+ *   клиенту через прокси /api/uploads/{name} — это работает и с public, и с
+ *   private store.
+ * - dev: локальная FS в /public/uploads, отдаём напрямую как /uploads/{name}
  */
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
@@ -15,7 +14,7 @@ const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 export type SavedUpload = {
   /** URL для отдачи через <img src> и redirect-навигации. */
   url: string;
-  /** Имя файла без пути — используется в БД (`/uploads/${name}` или blob URL). */
+  /** Имя файла без пути — используется в БД (`/uploads/${name}` или /api/uploads/${name}). */
   storedPath: string;
 };
 
@@ -37,20 +36,42 @@ export async function saveUpload(
 ): Promise<SavedUpload> {
   if (useBlob()) {
     const { put } = await import("@vercel/blob");
-    const res = await put(filename, bytes, {
-      access: "public",
-      contentType: mime,
-      addRandomSuffix: false,
-      allowOverwrite: false,
-    });
-    return { url: res.url, storedPath: res.url };
+    // Пробуем сначала public (работает быстрее, прямой CDN-URL). Если store
+    // private — fallback на private и проксируем через наш роут.
+    let blobUrl: string;
+    try {
+      const res = await put(filename, bytes, {
+        access: "public",
+        contentType: mime,
+        addRandomSuffix: false,
+        allowOverwrite: false,
+      });
+      blobUrl = res.url;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/private/i.test(msg)) throw e;
+      // Store сконфигурирован private — кладём как private, отдаём через прокси.
+      const res = await put(filename, bytes, {
+        // @ts-expect-error access:'private' для приватных store, новые SDK имеют тип
+        access: "private",
+        contentType: mime,
+        addRandomSuffix: false,
+        allowOverwrite: false,
+      });
+      blobUrl = res.url;
+    }
+    // Для public store URL уже прямой; для private — отдадим через прокси.
+    const isDirectPublic = /\.public\.blob\.vercel-storage\.com\//.test(blobUrl);
+    if (isDirectPublic) {
+      return { url: blobUrl, storedPath: blobUrl };
+    }
+    const proxy = `/api/uploads/${encodeURIComponent(filename)}`;
+    return { url: proxy, storedPath: proxy };
   }
 
   if (isVercel()) {
     throw new Error(
-      "Vercel: BLOB_READ_WRITE_TOKEN не задан. Подключите Vercel Blob: " +
-        "Project → Storage → Create Database → Blob → Connect to Project. " +
-        "После этого Settings → Deployments → … → Redeploy (без галки «Use existing Build Cache»)."
+      "Vercel: BLOB_READ_WRITE_TOKEN не задан. Подключите Vercel Blob в Storage и сделайте Redeploy без кэша."
     );
   }
 
@@ -63,7 +84,7 @@ export async function saveUpload(
 export async function removeUpload(storedPath: string): Promise<void> {
   if (!storedPath) return;
   try {
-    if (useBlob() && storedPath.startsWith("http")) {
+    if (useBlob() && (storedPath.startsWith("http") || storedPath.startsWith("/api/uploads/"))) {
       const { del } = await import("@vercel/blob");
       await del(storedPath);
       return;
@@ -77,5 +98,9 @@ export async function removeUpload(storedPath: string): Promise<void> {
 }
 
 export function isStoredUploadPath(p: string): boolean {
-  return p.startsWith("/uploads/") || p.includes(".blob.vercel-storage.com/");
+  return (
+    p.startsWith("/uploads/") ||
+    p.startsWith("/api/uploads/") ||
+    p.includes(".blob.vercel-storage.com/")
+  );
 }

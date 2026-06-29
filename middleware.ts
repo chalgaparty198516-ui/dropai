@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
  * Запросы от <img>/<a download>/fetch — без text/html, отдаются как обычная статика.
  */
 export function middleware(req: NextRequest) {
+  // Только локальная FS — для blob-proxy /api/uploads/* и для прямых blob URL
+  // редирект не нужен.
   if (!req.nextUrl.pathname.startsWith("/uploads/")) return NextResponse.next();
   // ?raw=1 — явный опт-аут (нажатие «открыть оригинал» на /p/-странице)
   if (req.nextUrl.searchParams.get("raw") === "1") return NextResponse.next();
