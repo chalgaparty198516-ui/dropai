@@ -11,6 +11,19 @@ export const maxDuration = 30;
  * на фото — используется для авто-заполнения поля «Описание товара».
  */
 export async function POST(req: NextRequest) {
+  try {
+    return await handle(req);
+  } catch (e) {
+    const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    console.error("[/api/studio/describe] FATAL", e);
+    return NextResponse.json(
+      { error: `Внутренняя ошибка: ${msg.slice(0, 500)}` },
+      { status: 500 }
+    );
+  }
+}
+
+async function handle(req: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) {
     return NextResponse.json({ error: "Войдите в аккаунт" }, { status: 401 });

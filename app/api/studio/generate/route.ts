@@ -13,6 +13,19 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handle(req);
+  } catch (e) {
+    const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    console.error("[/api/studio/generate] FATAL", e);
+    return NextResponse.json(
+      { error: `Внутренняя ошибка: ${msg.slice(0, 500)}` },
+      { status: 500 }
+    );
+  }
+}
+
+async function handle(req: NextRequest) {
   await ensureMigrations();
 
   const session = await auth.api.getSession({ headers: await headers() });
