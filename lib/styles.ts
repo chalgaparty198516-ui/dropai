@@ -58,10 +58,10 @@ export const STYLES: Style[] = [
   {
     id: "luxury-card",
     label: "Премиум карточка",
-    description: "Бархат, мрамор, золотой свет",
+    description: "Заголовок + преимущества + мрамор",
     emoji: "✨",
     prompt:
-      "Place the product as the hero of a luxury marketplace card. Deep dark velvet background with a soft warm vignette, polished veined marble surface beneath with a delicate reflection, dramatic three-point cinematic lighting with a warm key light and cool subtle fill, faint golden bokeh in the far background. Editorial fine-art product photography for a premium brand, exquisite material detail, sharp focus on the product, gentle film grain, no text, no watermarks.",
+      "Design a premium marketplace product card. The product is the hero on the left side, photographed on polished veined marble against a deep dark velvet background with soft warm vignette and faint golden bokeh. On the right side place a tasteful editorial overlay: a large bold product TITLE in elegant serif typography, followed by 2-3 short BENEFIT BULLET POINTS in clean modern sans-serif with small minimalist line icons (a checkmark, leaf, shield, sparkle — whatever fits). Use a soft warm-white text color with subtle gold underline accents. Layout balanced like a high-end magazine ad. Sharp focus on the product, gentle film grain, photorealistic product rendering, crisp readable typography (NO gibberish letters), no watermarks.",
   },
 ];
 

@@ -40,6 +40,8 @@ async function handle(req: NextRequest) {
   const variantsRaw = Number(formData.get("variants") ?? 1);
   const variants = Math.max(1, Math.min(MAX_VARIANTS, isNaN(variantsRaw) ? 1 : variantsRaw));
   const quality = getQualityPreset(formData.get("quality")?.toString());
+  const productTitle = String(formData.get("title") ?? "").slice(0, 80).trim();
+  const benefits = String(formData.get("benefits") ?? "").slice(0, 400).trim();
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Файл не загружен" }, { status: 400 });
@@ -86,7 +88,31 @@ async function handle(req: NextRequest) {
   }
 
   const baseFinal = await enhancePrompt(extraPrompt, style.prompt);
-  const finalPrompt = (baseFinal + quality.promptBoost).slice(0, 1500);
+  // Для премиум-карточки подмешиваем заголовок и буллеты в финальный промпт.
+  // AI должен будет нарисовать их поверх изображения.
+  let overlayText = "";
+  if (style.id === "luxury-card" && (productTitle || benefits)) {
+    const bullets = benefits
+      ? benefits
+          .split(/[,;\n]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .slice(0, 4)
+      : [];
+    const overlayParts: string[] = [];
+    if (productTitle) overlayParts.push(`TITLE TEXT to render on the card (exact): "${productTitle}"`);
+    if (bullets.length)
+      overlayParts.push(
+        `BULLET TEXTS to render with small icons (exact, in order): ${bullets
+          .map((b) => `"${b}"`)
+          .join(", ")}`
+      );
+    overlayParts.push(
+      "Render the text crisp and perfectly readable — every letter sharp and correct, no garbled or misspelled words. Use English Latin if the input is Latin, Cyrillic if the input is Russian."
+    );
+    overlayText = " " + overlayParts.join(" ");
+  }
+  const finalPrompt = (baseFinal + overlayText + quality.promptBoost).slice(0, 2000);
 
   const seeds = Array.from({ length: variants }, (_, i) =>
     Math.floor(Math.random() * 1_000_000) + i * 31

@@ -102,6 +102,8 @@ export function StudioEditor({
   const [variants, setVariants] = useState<number>(1);
   const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY);
   const [describing, setDescribing] = useState(false);
+  const [title, setTitle] = useState("");
+  const [benefits, setBenefits] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [chosenVariant, setChosenVariant] = useState<number>(0);
@@ -158,6 +160,8 @@ export function StudioEditor({
       fd.append("prompt", prompt);
       fd.append("variants", String(variants));
       fd.append("quality", quality);
+      fd.append("title", title);
+      fd.append("benefits", benefits);
       const res = await fetch("/api/studio/generate", { method: "POST", body: fd });
       const raw = await res.text();
       if (!raw) {
@@ -517,6 +521,63 @@ export function StudioEditor({
             </p>
           )}
         </div>
+
+        {styleId === "luxury-card" && (
+          <div
+            className="glass-strong p-5 flex flex-col gap-4"
+            style={{ borderColor: "rgba(168,85,247,0.3)" }}
+          >
+            <div>
+              <p
+                className="text-xs font-semibold uppercase tracking-widest"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Текст на премиум-карточке
+              </p>
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
+                AI попробует нарисовать заголовок и буллеты прямо на изображении. Лучше всего
+                справляются OpenAI gpt-image-1 и Gemini Nano Banana — Pollinations Flux может
+                искажать буквы.
+              </p>
+            </div>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
+                Заголовок
+              </span>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Например: Шоколадные печенья"
+                maxLength={80}
+                className="px-3 py-2 rounded-xl text-sm outline-none"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
+                Преимущества (через запятую, 2–4 шт)
+              </span>
+              <textarea
+                value={benefits}
+                onChange={(e) => setBenefits(e.target.value)}
+                placeholder="Натуральный состав, Без сахара, Ручная работа"
+                maxLength={400}
+                rows={3}
+                className="px-3 py-2 rounded-xl text-sm resize-none outline-none"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </label>
+          </div>
+        )}
 
         <div className="glass-strong p-5 flex flex-col gap-3">
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
