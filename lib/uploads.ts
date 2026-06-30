@@ -76,9 +76,15 @@ export async function saveUpload(
   }
 
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  await fs.writeFile(path.join(UPLOAD_DIR, filename), bytes);
+  await fs.writeFile(path.join(UPLOAD_DIR, filename), safe);
   const rel = `/uploads/${filename}`;
   return { url: rel, storedPath: rel };
+}
+
+function toCleanBuffer(input: Buffer | Uint8Array): Buffer {
+  const ab = new ArrayBuffer(input.byteLength);
+  new Uint8Array(ab).set(input);
+  return Buffer.from(ab);
 }
 
 export async function removeUpload(storedPath: string): Promise<void> {
