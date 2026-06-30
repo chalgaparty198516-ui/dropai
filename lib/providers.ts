@@ -1,7 +1,14 @@
 import OpenAI, { toFile } from "openai";
 import https from "node:https";
 
-export type Provider = "openai" | "gemini" | "pollinations" | "demo";
+export type Provider =
+  | "openai"
+  | "replicate"
+  | "fal"
+  | "huggingface"
+  | "gemini"
+  | "pollinations"
+  | "demo";
 
 export type GenerateInput = {
   promptText: string;
@@ -31,6 +38,9 @@ export type GenerateOutput = {
 
 export const COSTS: Record<Provider, number> = {
   openai: 3,
+  replicate: 2,
+  fal: 2,
+  huggingface: 1,
   gemini: 1,
   pollinations: 1,
   demo: 0,
@@ -39,7 +49,13 @@ export const COSTS: Record<Provider, number> = {
 export const MAX_VARIANTS = 4;
 
 export function pickProvider(): Provider {
+  if (process.env.DROPAI_PROVIDER) {
+    return process.env.DROPAI_PROVIDER as Provider;
+  }
   if (process.env.OPENAI_API_KEY) return "openai";
+  if (process.env.REPLICATE_API_TOKEN) return "replicate";
+  if (process.env.FAL_KEY) return "fal";
+  if (process.env.HF_TOKEN) return "huggingface";
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.DROPAI_DISABLE_POLLINATIONS === "1") return "demo";
   return "pollinations";
@@ -50,6 +66,12 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
   switch (provider) {
     case "openai":
       return generateWithOpenAI(input);
+    case "replicate":
+      return generateWithReplicate(input);
+    case "fal":
+      return generateWithFal(input);
+    case "huggingface":
+      return generateWithHuggingFace(input);
     case "gemini": {
       try {
         return await generateWithGemini(input);
@@ -90,6 +112,214 @@ async function generateWithOpenAI(input: GenerateInput): Promise<GenerateOutput>
   const b64 = result.data?.[0]?.b64_json;
   if (!b64) throw new Error("OpenAI вернул пустой результат");
   return { bytes: Buffer.from(b64, "base64"), provider: "openai", cost: COSTS.openai };
+}
+
+/**
+ * Replicate · Flux Kontext Pro — настоящий image-to-image, сохраняет товар.
+ * Требует REPLICATE_API_TOKEN с https://replicate.com/account/api-tokens.
+ * ~$0.04 за изображение. Нужен публичный URL входной картинки.
+ */
+async function generateWithReplicate(input: GenerateInput): Promise<GenerateOutput> {
+  if (!input.inputPublicUrl) {
+    throw new Error(
+      "Replicate Flux Kontext требует публичный URL фото (PUBLIC_BASE_URL или Vercel Blob)."
+    );
+  }
+  const token = process.env.REPLICATE_API_TOKEN!;
+  const model = process.env.REPLICATE_MODEL || "black-forest-labs/flux-kontext-pro";
+  const start = await httpsPostJsonGeneric(
+    `https://api.replicate.com/v1/models/${model}/predictions`,
+    JSON.stringify({
+      input: {
+        prompt: input.promptText,
+        input_image: input.inputPublicUrl,
+        output_format: "png",
+        aspect_ratio: "1:1",
+        seed: input.seed,
+      },
+    }),
+    60_000,
+    { authorization: `Bearer ${token}`, prefer: "wait" }
+  );
+  // Если Replicate отдал sync-ответ (prefer:wait + быстрая модель) — output уже там.
+  // Иначе polling.
+  let result = start;
+  const deadline = Date.now() + 90_000;
+  while (
+    result?.status &&
+    result.status !== "succeeded" &&
+    result.status !== "failed" &&
+    result.status !== "canceled"
+  ) {
+    if (Date.now() > deadline) throw new Error("Replicate: timeout");
+    await new Promise((r) => setTimeout(r, 1500));
+    result = await httpsGetJson(`https://api.replicate.com/v1/predictions/${result.id}`, 30_000, {
+      authorization: `Bearer ${token}`,
+    });
+  }
+  if (result.status !== "succeeded") {
+    throw new Error(`Replicate: ${result.status} ${result.error || ""}`.slice(0, 200));
+  }
+  const url = Array.isArray(result.output) ? result.output[0] : result.output;
+  if (!url) throw new Error("Replicate не вернул URL результата");
+  const bytes = await httpsGetBuffer(url, 60_000);
+  return {
+    bytes,
+    provider: "replicate",
+    cost: COSTS.replicate,
+    usedImg2Img: true,
+  };
+}
+
+/**
+ * fal.ai · Flux Kontext — image-to-image. Требует FAL_KEY с https://fal.ai/dashboard/keys.
+ * Очень быстрый, ~$0.04 за изображение.
+ */
+async function generateWithFal(input: GenerateInput): Promise<GenerateOutput> {
+  if (!input.inputPublicUrl) {
+    throw new Error(
+      "fal.ai Flux Kontext требует публичный URL фото (PUBLIC_BASE_URL или Vercel Blob)."
+    );
+  }
+  const key = process.env.FAL_KEY!;
+  const model = process.env.FAL_MODEL || "fal-ai/flux-pro/kontext";
+  const submit = await httpsPostJsonGeneric(
+    `https://queue.fal.run/${model}`,
+    JSON.stringify({
+      prompt: input.promptText,
+      image_url: input.inputPublicUrl,
+      output_format: "png",
+      aspect_ratio: "1:1",
+      seed: input.seed,
+    }),
+    60_000,
+    { authorization: `Key ${key}` }
+  );
+  const requestId = submit?.request_id || submit?.id;
+  if (!requestId) throw new Error(`fal.ai: нет request_id (${JSON.stringify(submit).slice(0, 200)})`);
+
+  // poll
+  const deadline = Date.now() + 90_000;
+  let status: { status?: string; logs?: unknown } = {};
+  while (Date.now() < deadline) {
+    status = await httpsGetJson(
+      `https://queue.fal.run/${model.split("/")[0]}/requests/${requestId}/status`,
+      15_000,
+      { authorization: `Key ${key}` }
+    );
+    if (status.status === "COMPLETED") break;
+    if (status.status === "FAILED") throw new Error(`fal.ai: failed`);
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  if (status.status !== "COMPLETED") throw new Error("fal.ai: timeout");
+  const result = await httpsGetJson(
+    `https://queue.fal.run/${model.split("/")[0]}/requests/${requestId}`,
+    15_000,
+    { authorization: `Key ${key}` }
+  );
+  const url = result?.images?.[0]?.url || result?.image?.url;
+  if (!url) throw new Error("fal.ai не вернул URL");
+  const bytes = await httpsGetBuffer(url, 60_000);
+  return { bytes, provider: "fal", cost: COSTS.fal, usedImg2Img: true };
+}
+
+/**
+ * HuggingFace · Stable Diffusion XL img2img — бесплатный image-to-image
+ * через Inference API. Требует HF_TOKEN с https://huggingface.co/settings/tokens (Read).
+ * Качество хуже Flux Kontext, но бесплатно.
+ */
+async function generateWithHuggingFace(input: GenerateInput): Promise<GenerateOutput> {
+  const token = process.env.HF_TOKEN!;
+  const model =
+    process.env.HF_IMG2IMG_MODEL || "stabilityai/stable-diffusion-xl-refiner-1.0";
+  const url = `https://api-inference.huggingface.co/models/${model}`;
+  const body = JSON.stringify({
+    inputs: input.promptText,
+    parameters: {
+      image: `data:${input.inputMime};base64,${input.inputBytes.toString("base64")}`,
+      strength: 0.5,
+      num_inference_steps: 30,
+    },
+  });
+  const bytes = await httpsPostRawBytes(url, body, 60_000, {
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+    accept: "image/png",
+  });
+  if (bytes.byteLength < 1024) {
+    throw new Error(`HF SDXL: пустой ответ (${bytes.toString("utf8").slice(0, 200)})`);
+  }
+  return { bytes, provider: "huggingface", cost: COSTS.huggingface, usedImg2Img: true };
+}
+
+function httpsGetJson(
+  url: string,
+  timeoutMs: number,
+  extraHeaders: Record<string, string> = {}
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const verify =
+      process.env.NODE_ENV === "production" && process.env.DROPAI_INSECURE_FETCH !== "1";
+    const req = https.get(
+      {
+        hostname: u.hostname,
+        path: `${u.pathname}${u.search}`,
+        port: u.port || 443,
+        headers: { "user-agent": "drop-ai/1.0", ...extraHeaders },
+        timeout: timeoutMs,
+        rejectUnauthorized: verify,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+          } catch {
+            resolve({});
+          }
+        });
+        res.on("error", reject);
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error("GET timeout")));
+    req.on("error", reject);
+  });
+}
+
+function httpsPostRawBytes(
+  url: string,
+  body: string,
+  timeoutMs: number,
+  headers: Record<string, string>
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const verify =
+      process.env.NODE_ENV === "production" && process.env.DROPAI_INSECURE_FETCH !== "1";
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        path: `${u.pathname}${u.search}`,
+        port: u.port || 443,
+        method: "POST",
+        headers: { ...headers, "content-length": Buffer.byteLength(body), "user-agent": "drop-ai/1.0" },
+        timeout: timeoutMs,
+        rejectUnauthorized: verify,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => resolve(Buffer.concat(chunks)));
+        res.on("error", reject);
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error("POST timeout")));
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
 }
 
 async function generateWithGemini(input: GenerateInput): Promise<GenerateOutput> {

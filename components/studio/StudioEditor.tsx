@@ -17,7 +17,14 @@ import {
 import { STYLES, DEFAULT_STYLE_ID } from "@/lib/styles";
 import { QUALITY_PRESETS, DEFAULT_QUALITY, type Quality } from "@/lib/quality";
 
-type Provider = "openai" | "gemini" | "pollinations" | "demo";
+type Provider =
+  | "openai"
+  | "replicate"
+  | "fal"
+  | "huggingface"
+  | "gemini"
+  | "pollinations"
+  | "demo";
 
 type Variant = { id: string; outputUrl: string; provider: Provider; cost: number };
 type Result = {
@@ -35,6 +42,24 @@ const PROVIDER_META: Record<Provider, { label: string; tone: string; explain: st
     label: "OpenAI · gpt-image-1",
     tone: "#a3e635",
     explain: "Платная модель, сохраняет товар 1-в-1. Самое высокое качество.",
+  },
+  replicate: {
+    label: "Replicate · Flux Kontext Pro",
+    tone: "#f472b6",
+    explain:
+      "Платный image-to-image (~$0.04 за карточку). Flux Kontext сохраняет товар и применяет сцену из стиля. Нужен REPLICATE_API_TOKEN.",
+  },
+  fal: {
+    label: "fal.ai · Flux Kontext",
+    tone: "#fb7185",
+    explain:
+      "Платный image-to-image, очень быстрый (5–10 сек). Качество Flux Kontext. Нужен FAL_KEY.",
+  },
+  huggingface: {
+    label: "HuggingFace · SDXL img2img",
+    tone: "#fde047",
+    explain:
+      "БЕСПЛАТНЫЙ image-to-image через HF Inference. Качество ниже Flux Kontext, но фото-референс используется. Нужен HF_TOKEN.",
   },
   gemini: {
     label: "Google Gemini · Nano Banana",
