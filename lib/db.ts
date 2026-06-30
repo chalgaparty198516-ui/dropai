@@ -47,6 +47,20 @@ export interface Tables {
     created_at: number;
     paid_at: number | null;
   };
+  promo_codes: {
+    code: string;
+    clicks: number;
+    max_uses: number;
+    used_count: number;
+    created_at: number;
+  };
+  promo_redemptions: {
+    id: number;
+    code: string;
+    user_id: string;
+    clicks: number;
+    created_at: number;
+  };
   user: {
     id: string;
     name: string | null;
@@ -128,6 +142,25 @@ export async function ensureMigrations(): Promise<void> {
 
   if (IS_POSTGRES) {
     await sql`
+      CREATE TABLE IF NOT EXISTS promo_codes (
+        code TEXT PRIMARY KEY,
+        clicks INTEGER NOT NULL,
+        max_uses INTEGER NOT NULL DEFAULT 1,
+        used_count INTEGER NOT NULL DEFAULT 0,
+        created_at BIGINT NOT NULL
+      )
+    `.execute(db);
+    await sql`
+      CREATE TABLE IF NOT EXISTS promo_redemptions (
+        id SERIAL PRIMARY KEY,
+        code TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        clicks INTEGER NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE(code, user_id)
+      )
+    `.execute(db);
+    await sql`
       CREATE TABLE IF NOT EXISTS generations (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -162,6 +195,25 @@ export async function ensureMigrations(): Promise<void> {
     );
   } else {
     await sql`
+      CREATE TABLE IF NOT EXISTS promo_codes (
+        code TEXT PRIMARY KEY,
+        clicks INTEGER NOT NULL,
+        max_uses INTEGER NOT NULL DEFAULT 1,
+        used_count INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      )
+    `.execute(db);
+    await sql`
+      CREATE TABLE IF NOT EXISTS promo_redemptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        clicks INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        UNIQUE(code, user_id)
+      )
+    `.execute(db);
+    await sql`
       CREATE TABLE IF NOT EXISTS generations (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -195,7 +247,27 @@ export async function ensureMigrations(): Promise<void> {
       db
     );
   }
+
+  // Сидим/обновляем preset-промокоды.
+  for (const p of PRESET_PROMOS) {
+    if (IS_POSTGRES) {
+      await sql`
+        INSERT INTO promo_codes (code, clicks, max_uses, used_count, created_at)
+        VALUES (${p.code}, ${p.clicks}, ${p.max_uses}, 0, ${Date.now()})
+        ON CONFLICT (code) DO NOTHING
+      `.execute(db);
+    } else {
+      await sql`
+        INSERT OR IGNORE INTO promo_codes (code, clicks, max_uses, used_count, created_at)
+        VALUES (${p.code}, ${p.clicks}, ${p.max_uses}, 0, ${Date.now()})
+      `.execute(db);
+    }
+  }
 }
+
+const PRESET_PROMOS: Array<{ code: string; clicks: number; max_uses: number }> = [
+  { code: "ДРОП20000", clicks: 20000, max_uses: 1 },
+];
 
 /** Удобный helper для получения баланса. */
 export async function getUserClicks(userId: string): Promise<number> {

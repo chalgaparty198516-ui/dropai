@@ -7,6 +7,7 @@ import { PLANS } from "@/lib/plans";
 import { getRobokassaEnv } from "@/lib/robokassa";
 import { StudioHeader } from "@/components/studio/StudioHeader";
 import { BillingPlanGrid } from "@/components/billing/BillingPlanGrid";
+import { PromoCodeForm } from "@/components/billing/PromoCodeForm";
 
 export const metadata = { title: "Тарифы и оплата — DROP.AI" };
 
@@ -53,6 +54,8 @@ export default async function BillingPage() {
             )}
           </p>
         </div>
+
+        <PromoCodeForm />
 
         <BillingPlanGrid plans={PLANS} configured={env.isConfigured} />
 
