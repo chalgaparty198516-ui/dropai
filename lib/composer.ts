@@ -71,7 +71,7 @@ export async function addLuxuryOverlay(
             height: `${H}px`,
             padding: `${padding}px`,
             background:
-              "linear-gradient(to right, rgba(10,7,7,0.55) 0%, rgba(10,7,7,0.92) 35%, rgba(10,7,7,0.96) 100%)",
+              "linear-gradient(to right, rgba(10,7,7,0) 0%, rgba(20,10,10,0.6) 15%, rgba(35,18,30,0.92) 55%, rgba(50,25,45,0.95) 100%)",
             color: "#f5e6c8",
             justifyContent: "center",
             gap: `${Math.round(padding * 0.4)}px`,

@@ -56,6 +56,14 @@ export const STYLES: Style[] = [
       "Place the product on a deep matte black backdrop with dramatic rim lighting and a subtle reflective surface beneath, premium luxury product photography, sharp focus, no text, no watermarks.",
   },
   {
+    id: "color-gradient",
+    label: "Цветной градиент",
+    description: "Современный пастельный фон",
+    emoji: "🎨",
+    prompt:
+      "Re-photograph the EXACT product from the reference image — preserve its identity, shape, colors and details. Place it centered on a smooth modern pastel gradient background blending soft peach, lavender and mint with subtle film grain. Clean studio lighting, soft realistic shadow beneath the product, sharp focus, contemporary e-commerce aesthetic, no text, no watermarks.",
+  },
+  {
     id: "luxury-card",
     label: "Премиум карточка",
     description: "Заголовок + преимущества + мрамор",
