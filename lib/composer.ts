@@ -12,8 +12,12 @@ export async function addLuxuryOverlay(
 ): Promise<Buffer> {
   if (!title && benefits.length === 0) return imageBytes;
 
+  // На Vercel Buffer может приходить с backing SharedArrayBuffer (через fetch/worker)
+  // — sharp такие не принимает. Создаём свежий Buffer с обычным ArrayBuffer.
+  const safe = Buffer.from(Uint8Array.from(imageBytes));
+
   // Узнаём реальный размер картинки чтобы посчитать пропорции.
-  const meta = await sharp(imageBytes).metadata();
+  const meta = await sharp(safe).metadata();
   const W = meta.width ?? 1024;
   const H = meta.height ?? 1024;
 
@@ -100,7 +104,7 @@ export async function addLuxuryOverlay(
   ${benefitItems}
 </svg>`;
 
-  return sharp(imageBytes)
+  return sharp(safe)
     .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
     .png()
     .toBuffer();
