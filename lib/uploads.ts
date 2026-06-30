@@ -34,13 +34,20 @@ export async function saveUpload(
   filename: string,
   mime: string
 ): Promise<SavedUpload> {
+  // КРИТИЧНО: на Vercel runtime undici-fetch (которым внутри пользуется
+  // @vercel/blob) отвергает body, если он Buffer/Uint8Array c backing
+  // SharedArrayBuffer. Кладём байты в новый ArrayBuffer и оборачиваем в
+  // Web API Blob — он создаёт свой clean backing.
+  const safeAB = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(safeAB).set(bytes);
+  const safe = Buffer.from(safeAB);
+  const webBlob = new Blob([new Uint8Array(safeAB)], { type: mime });
+
   if (useBlob()) {
     const { put } = await import("@vercel/blob");
-    // Пробуем сначала public (работает быстрее, прямой CDN-URL). Если store
-    // private — fallback на private и проксируем через наш роут.
     let blobUrl: string;
     try {
-      const res = await put(filename, bytes, {
+      const res = await put(filename, webBlob, {
         access: "public",
         contentType: mime,
         addRandomSuffix: false,
@@ -50,9 +57,8 @@ export async function saveUpload(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!/private/i.test(msg)) throw e;
-      // Store сконфигурирован private — кладём как private, отдаём через прокси.
-      const res = await put(filename, bytes, {
-        // @ts-expect-error access:'private' для приватных store, новые SDK имеют тип
+      const res = await put(filename, webBlob, {
+        // @ts-expect-error access:'private' для приватных store
         access: "private",
         contentType: mime,
         addRandomSuffix: false,
@@ -60,11 +66,8 @@ export async function saveUpload(
       });
       blobUrl = res.url;
     }
-    // Для public store URL уже прямой; для private — отдадим через прокси.
     const isDirectPublic = /\.public\.blob\.vercel-storage\.com\//.test(blobUrl);
-    if (isDirectPublic) {
-      return { url: blobUrl, storedPath: blobUrl };
-    }
+    if (isDirectPublic) return { url: blobUrl, storedPath: blobUrl };
     const proxy = `/api/uploads/${encodeURIComponent(filename)}`;
     return { url: proxy, storedPath: proxy };
   }
@@ -79,12 +82,6 @@ export async function saveUpload(
   await fs.writeFile(path.join(UPLOAD_DIR, filename), safe);
   const rel = `/uploads/${filename}`;
   return { url: rel, storedPath: rel };
-}
-
-function toCleanBuffer(input: Buffer | Uint8Array): Buffer {
-  const ab = new ArrayBuffer(input.byteLength);
-  new Uint8Array(ab).set(input);
-  return Buffer.from(ab);
 }
 
 export async function removeUpload(storedPath: string): Promise<void> {
