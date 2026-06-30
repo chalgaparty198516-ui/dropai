@@ -22,16 +22,26 @@ export async function addLuxuryOverlay(
   const textWidth = Math.round(W * 0.42);
   const startY = Math.round(H * 0.18);
 
-  const titleSize = Math.round(W * 0.058);
-  const benefitSize = Math.round(W * 0.028);
-  const benefitGap = Math.round(W * 0.05);
+  // Авто-подгон размера заголовка под доступную ширину (~textWidth)
+  // Эмпирика: 0.55 * fontSize ≈ ширина символа для Georgia bold.
+  const longestTitleLine = (title || "").length;
+  let titleSize = Math.round(W * 0.062);
+  if (longestTitleLine > 0) {
+    const maxByWidth = Math.floor(textWidth / (longestTitleLine * 0.55));
+    titleSize = Math.min(titleSize, maxByWidth);
+    titleSize = Math.max(titleSize, Math.round(W * 0.032)); // нижняя граница
+  }
+  const benefitSize = Math.round(Math.max(W * 0.024, titleSize * 0.42));
+  const benefitGap = Math.round(benefitSize * 1.9);
   const checkSize = Math.round(benefitSize * 1.2);
 
   // Тёмная вуаль справа для контраста (если AI не оставил пустое место)
   const vignetteX = Math.round(W * 0.48);
   const vignetteW = W - vignetteX;
 
-  const wrappedTitle = wrapTextLines(title, 18);
+  // Длина строки заголовка подобрана так, чтобы в textWidth помещалась при текущем titleSize
+  const maxCharsTitle = Math.max(8, Math.floor(textWidth / (titleSize * 0.55)));
+  const wrappedTitle = wrapTextLines(title, maxCharsTitle);
   const titleLines = wrappedTitle
     .map(
       (line, i) =>

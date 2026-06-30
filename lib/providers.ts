@@ -79,7 +79,7 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
         // Если Gemini вернул quota/billing-ошибку — мягко переключаемся на Pollinations,
         // чтобы пользователь не получил пустой результат.
         const msg = e instanceof Error ? e.message : String(e);
-        if (/quota|billing|429/i.test(msg)) {
+        if (/quota|billing|429|503|unavailable|overloaded|exceeded/i.test(msg)) {
           const fallback = await generateWithPollinations(input);
           return {
             ...fallback,
