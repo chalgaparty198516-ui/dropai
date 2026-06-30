@@ -21,6 +21,8 @@
     "pg": "^8.22.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "roboto-fontface": "^0.10.0",
+    "satori": "^0.26.0",
     "sharp": "^0.35.2"
   },
   "devDependencies": {
