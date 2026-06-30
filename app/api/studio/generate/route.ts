@@ -26,6 +26,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
+async function toOwnedBuffer(file: File): Promise<Buffer> {
+  const src = new Uint8Array(await file.arrayBuffer());
+  const ab = new ArrayBuffer(src.byteLength);
+  new Uint8Array(ab).set(src);
+  return Buffer.from(ab);
+}
+
 async function handle(req: NextRequest) {
   await ensureMigrations();
 
@@ -76,7 +83,10 @@ async function handle(req: NextRequest) {
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const baseId = crypto.randomUUID();
   const inputName = `${baseId}-in.${ext}`;
-  const inputBytes = Buffer.from(await file.arrayBuffer());
+  // На Vercel file.arrayBuffer() возвращает SharedArrayBuffer-backed view,
+  // что ломает Buffer.from / sharp / @vercel/blob. Всегда копируем в собственный
+  // ArrayBuffer.
+  const inputBytes = await toOwnedBuffer(file);
   const inputSaved = await saveUpload(inputBytes, inputName, file.type);
 
   // Публичный URL для image-to-image моделей (включая ситуацию когда мы на проде с blob).

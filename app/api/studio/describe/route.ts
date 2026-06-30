@@ -45,7 +45,11 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ error: "Поддерживаются JPG, PNG, WebP" }, { status: 400 });
   }
 
-  const bytes = Buffer.from(await file.arrayBuffer());
+  // Vercel может вернуть SharedArrayBuffer-backed view — копируем в чистый.
+  const src = new Uint8Array(await file.arrayBuffer());
+  const ab = new ArrayBuffer(src.byteLength);
+  new Uint8Array(ab).set(src);
+  const bytes = Buffer.from(ab);
   const { describeWithGeminiVisionExported } = await import("@/lib/providers");
   try {
     const text = await describeWithGeminiVisionExported(
