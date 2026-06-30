@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { auth } from "@/lib/auth";
 import { db, ensureMigrations, getUserClicks, adjustUserClicks } from "@/lib/db";
 import { saveUpload } from "@/lib/uploads";
+import { addLuxuryOverlay } from "@/lib/composer";
 import { STYLES } from "@/lib/styles";
 import { generate, enhancePrompt, pickProvider, COSTS, MAX_VARIANTS } from "@/lib/providers";
 import { getQualityPreset } from "@/lib/quality";
@@ -88,31 +89,17 @@ async function handle(req: NextRequest) {
   }
 
   const baseFinal = await enhancePrompt(extraPrompt, style.prompt);
-  // Для премиум-карточки подмешиваем заголовок и буллеты в финальный промпт.
-  // AI должен будет нарисовать их поверх изображения.
-  let overlayText = "";
-  if (style.id === "luxury-card" && (productTitle || benefits)) {
-    const bullets = benefits
+  // Текст на премиум-карточке накладываем через sharp ПОСЛЕ генерации (см. ниже),
+  // а AI просим просто оставить правую половину пустой и сохранить товар как есть.
+  const luxuryBullets =
+    style.id === "luxury-card" && benefits
       ? benefits
           .split(/[,;\n]+/)
           .map((s) => s.trim())
           .filter(Boolean)
           .slice(0, 4)
       : [];
-    const overlayParts: string[] = [];
-    if (productTitle) overlayParts.push(`TITLE TEXT to render on the card (exact): "${productTitle}"`);
-    if (bullets.length)
-      overlayParts.push(
-        `BULLET TEXTS to render with small icons (exact, in order): ${bullets
-          .map((b) => `"${b}"`)
-          .join(", ")}`
-      );
-    overlayParts.push(
-      "Render the text crisp and perfectly readable — every letter sharp and correct, no garbled or misspelled words. Use English Latin if the input is Latin, Cyrillic if the input is Russian."
-    );
-    overlayText = " " + overlayParts.join(" ");
-  }
-  const finalPrompt = (baseFinal + overlayText + quality.promptBoost).slice(0, 2000);
+  const finalPrompt = (baseFinal + quality.promptBoost).slice(0, 2000);
 
   const seeds = Array.from({ length: variants }, (_, i) =>
     Math.floor(Math.random() * 1_000_000) + i * 31
@@ -152,7 +139,17 @@ async function handle(req: NextRequest) {
     if (r.status !== "fulfilled") continue;
     const id = `${baseId}-${i}`;
     const outName = `${id}-out.png`;
-    const outSaved = await saveUpload(r.value.bytes, outName, "image/png");
+    // Для премиум-стиля накладываем реальный SVG-overlay с заголовком/буллетами
+    let finalBytes = r.value.bytes;
+    if (style.id === "luxury-card" && (productTitle || luxuryBullets.length)) {
+      try {
+        finalBytes = await addLuxuryOverlay(r.value.bytes, productTitle, luxuryBullets);
+      } catch (e) {
+        console.warn("[luxury overlay] fail:", e);
+        // не критично — отдадим без overlay
+      }
+    }
+    const outSaved = await saveUpload(finalBytes, outName, "image/png");
     outputs.push({
       id,
       outputUrl: outSaved.url,

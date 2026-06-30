@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // output:"standalone" нужен только для Docker. Vercel умеет сам.
   // Раскомментируй если деплоишь через Dockerfile:
   // output: "standalone",
-  serverExternalPackages: ["better-sqlite3", "pg"],
+  serverExternalPackages: ["better-sqlite3", "pg", "sharp"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },

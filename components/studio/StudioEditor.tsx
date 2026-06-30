@@ -535,9 +535,8 @@ export function StudioEditor({
                 Текст на премиум-карточке
               </p>
               <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
-                AI попробует нарисовать заголовок и буллеты прямо на изображении. Лучше всего
-                справляются OpenAI gpt-image-1 и Gemini Nano Banana — Pollinations Flux может
-                искажать буквы.
+                ✓ Заголовок и буллеты накладываются после AI-генерации как настоящий шрифт —
+                всегда чёткий и читаемый на любом языке.
               </p>
             </div>
             <label className="flex flex-col gap-1.5">

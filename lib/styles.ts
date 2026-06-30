@@ -61,7 +61,7 @@ export const STYLES: Style[] = [
     description: "Заголовок + преимущества + мрамор",
     emoji: "✨",
     prompt:
-      "Design a premium marketplace product card. The product is the hero on the left side, photographed on polished veined marble against a deep dark velvet background with soft warm vignette and faint golden bokeh. On the right side place a tasteful editorial overlay: a large bold product TITLE in elegant serif typography, followed by 2-3 short BENEFIT BULLET POINTS in clean modern sans-serif with small minimalist line icons (a checkmark, leaf, shield, sparkle — whatever fits). Use a soft warm-white text color with subtle gold underline accents. Layout balanced like a high-end magazine ad. Sharp focus on the product, gentle film grain, photorealistic product rendering, crisp readable typography (NO gibberish letters), no watermarks.",
+      "Re-photograph the EXACT product from the reference image — preserve its identity, shape, colors, pattern and key details with high fidelity. Place it on the LEFT HALF of the frame on polished veined marble, against a deep dark velvet background with soft warm vignette, dramatic three-point lighting (warm key, cool fill) and faint golden bokeh in the far background. The RIGHT HALF of the frame must stay clean and empty — just the velvet+bokeh background, NO text, NO labels, NO objects, NO graphics. Editorial fine-art product photography for a premium brand, exquisite material detail, sharp focus, gentle film grain, no watermarks.",
   },
 ];
 

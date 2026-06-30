@@ -19,7 +19,8 @@
     "openai": "^6.45.0",
     "pg": "^8.22.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "sharp": "^0.35.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
