@@ -47,10 +47,14 @@ export async function addLuxuryOverlay(
   // Длина строки заголовка подобрана так, чтобы в textWidth помещалась при текущем titleSize
   const maxCharsTitle = Math.max(8, Math.floor(textWidth / (titleSize * 0.55)));
   const wrappedTitle = wrapTextLines(title, maxCharsTitle);
+  // ВАЖНО: librsvg на Vercel/Linux НЕ имеет Georgia/Times — рендерится пустое.
+  // DejaVu Serif/Sans гарантированно есть в Linux и поддерживает кириллицу.
+  const TITLE_FONT = "'DejaVu Serif', 'Liberation Serif', 'Noto Serif', serif";
+  const SANS_FONT = "'DejaVu Sans', 'Liberation Sans', 'Noto Sans', sans-serif";
   const titleLines = wrappedTitle
     .map(
       (line, i) =>
-        `<text x="${textX}" y="${startY + (i + 1) * titleSize * 1.15}" font-family="Georgia, 'Times New Roman', serif" font-size="${titleSize}" font-weight="700" fill="#f5e6c8" letter-spacing="-1">${escapeXml(
+        `<text x="${textX}" y="${startY + (i + 1) * titleSize * 1.15}" font-family="${TITLE_FONT}" font-size="${titleSize}" font-weight="bold" fill="#f5e6c8" stroke="#1a1208" stroke-width="${Math.max(1, titleSize * 0.04)}" paint-order="stroke">${escapeXml(
           line
         )}</text>`
     )
@@ -74,7 +78,7 @@ export async function addLuxuryOverlay(
       const lines = wrapped
         .map(
           (line, li) =>
-            `<text x="${textX + checkSize * 1.6}" y="${y + (li + 1) * benefitSize * 1.15}" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="${benefitSize}" fill="#e8e3d8" font-weight="500">${escapeXml(
+            `<text x="${textX + checkSize * 1.6}" y="${y + (li + 1) * benefitSize * 1.15}" font-family="${SANS_FONT}" font-size="${benefitSize}" fill="#e8e3d8" font-weight="500" stroke="#1a1208" stroke-width="${Math.max(1, benefitSize * 0.04)}" paint-order="stroke">${escapeXml(
               line
             )}</text>`
         )
@@ -91,12 +95,13 @@ export async function addLuxuryOverlay(
     })
     .join("\n");
 
+  // Плотный slab справа гарантирует, что текст всегда контрастный поверх AI-картинки.
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <linearGradient id="rightFade" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#000" stop-opacity="0"/>
-      <stop offset="30%" stop-color="#000" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#000" stop-opacity="0.85"/>
+      <stop offset="0%" stop-color="#0a0707" stop-opacity="0"/>
+      <stop offset="15%" stop-color="#0a0707" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#0a0707" stop-opacity="0.92"/>
     </linearGradient>
   </defs>
   <rect x="${vignetteX}" y="0" width="${vignetteW}" height="${H}" fill="url(#rightFade)"/>
