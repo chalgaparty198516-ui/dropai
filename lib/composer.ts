@@ -13,8 +13,9 @@ export async function addLuxuryOverlay(
   if (!title && benefits.length === 0) return imageBytes;
 
   // На Vercel Buffer может приходить с backing SharedArrayBuffer (через fetch/worker)
-  // — sharp такие не принимает. Создаём свежий Buffer с обычным ArrayBuffer.
-  const safe = Buffer.from(Uint8Array.from(imageBytes));
+  // — sharp такие не принимает. Делаем максимально-явное копирование в новый
+  // обычный ArrayBuffer.
+  const safe = copyToOwnedBuffer(imageBytes);
 
   // Узнаём реальный размер картинки чтобы посчитать пропорции.
   const meta = await sharp(safe).metadata();
@@ -108,6 +109,18 @@ export async function addLuxuryOverlay(
     .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
     .png()
     .toBuffer();
+}
+
+/**
+ * Создаёт Buffer с полностью изолированным ArrayBuffer (не SharedArrayBuffer).
+ * Vercel/edge runtime иногда отдаёт буферы с shared backing — sharp такие
+ * отвергает. Прокидываем через свежий ArrayBuffer.
+ */
+function copyToOwnedBuffer(input: Buffer | Uint8Array): Buffer {
+  const ab = new ArrayBuffer(input.byteLength);
+  const view = new Uint8Array(ab);
+  for (let i = 0; i < input.byteLength; i++) view[i] = input[i];
+  return Buffer.from(ab);
 }
 
 function wrapTextLines(text: string, maxCharsPerLine: number): string[] {

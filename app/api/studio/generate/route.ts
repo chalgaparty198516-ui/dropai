@@ -145,8 +145,9 @@ async function handle(req: NextRequest) {
       try {
         finalBytes = await addLuxuryOverlay(r.value.bytes, productTitle, luxuryBullets);
       } catch (e) {
-        console.warn("[luxury overlay] fail:", e);
-        // не критично — отдадим без overlay
+        // Sharp может падать на edge runtime с разными причинами. Главное —
+        // не валить весь запрос: отдаём AI-картинку без overlay-текста.
+        console.warn("[luxury overlay] fail (returning image without overlay):", e);
       }
     }
     const outSaved = await saveUpload(finalBytes, outName, "image/png");
