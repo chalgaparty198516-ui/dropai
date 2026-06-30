@@ -18,9 +18,10 @@ export async function POST(req: NextRequest) {
     return await handle(req);
   } catch (e) {
     const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    const stack = e instanceof Error && e.stack ? e.stack.split("\n").slice(0, 6).join(" | ") : "";
     console.error("[/api/studio/generate] FATAL", e);
     return NextResponse.json(
-      { error: `Внутренняя ошибка: ${msg.slice(0, 500)}` },
+      { error: `Внутренняя ошибка: ${msg.slice(0, 300)}${stack ? ` // STACK: ${stack.slice(0, 600)}` : ""}` },
       { status: 500 }
     );
   }
