@@ -1,4 +1,37 @@
 import sharp from "sharp";
+import fs from "node:fs/promises";
+import path from "node:path";
+
+/**
+ * Загружаем Cyrillic-вариант Noto Sans из @fontsource/noto-sans (positioned
+ * inside node_modules — гарантированно есть и в dev, и на Vercel build).
+ * Embed его как base64 в SVG @font-face, чтобы librsvg внутри sharp на любом
+ * Linux-runtime мог отрендерить текст без системного fontconfig.
+ */
+let cachedFonts: { reg: string; bold: string } | null = null;
+async function loadEmbeddedFonts(): Promise<{ reg: string; bold: string }> {
+  if (cachedFonts) return cachedFonts;
+  const base = path.join(
+    process.cwd(),
+    "node_modules",
+    "@fontsource",
+    "noto-sans",
+    "files"
+  );
+  const [regBuf, boldBuf] = await Promise.all([
+    fs.readFile(path.join(base, "noto-sans-cyrillic-ext-400-normal.woff")).catch(() =>
+      fs.readFile(path.join(base, "noto-sans-cyrillic-400-normal.woff"))
+    ),
+    fs.readFile(path.join(base, "noto-sans-cyrillic-ext-700-normal.woff")).catch(() =>
+      fs.readFile(path.join(base, "noto-sans-cyrillic-700-normal.woff"))
+    ),
+  ]);
+  cachedFonts = {
+    reg: regBuf.toString("base64"),
+    bold: boldBuf.toString("base64"),
+  };
+  return cachedFonts;
+}
 
 /**
  * Наложить заголовок + буллеты на правую половину карточки.
@@ -47,10 +80,11 @@ export async function addLuxuryOverlay(
   // Длина строки заголовка подобрана так, чтобы в textWidth помещалась при текущем titleSize
   const maxCharsTitle = Math.max(8, Math.floor(textWidth / (titleSize * 0.55)));
   const wrappedTitle = wrapTextLines(title, maxCharsTitle);
-  // ВАЖНО: librsvg на Vercel/Linux НЕ имеет Georgia/Times — рендерится пустое.
-  // DejaVu Serif/Sans гарантированно есть в Linux и поддерживает кириллицу.
-  const TITLE_FONT = "'DejaVu Serif', 'Liberation Serif', 'Noto Serif', serif";
-  const SANS_FONT = "'DejaVu Sans', 'Liberation Sans', 'Noto Sans', sans-serif";
+  // Шрифт встраиваем в SVG как base64 — librsvg на Vercel не имеет fontconfig,
+  // но @font-face с data: URL он понимает.
+  const fonts = await loadEmbeddedFonts();
+  const TITLE_FONT = "'NotoSansEmbedded', sans-serif";
+  const SANS_FONT = "'NotoSansEmbedded', sans-serif";
   const titleLines = wrappedTitle
     .map(
       (line, i) =>
@@ -96,8 +130,23 @@ export async function addLuxuryOverlay(
     .join("\n");
 
   // Плотный slab справа гарантирует, что текст всегда контрастный поверх AI-картинки.
+  // Шрифт встроен в SVG как base64 @font-face — работает без системных шрифтов.
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
+    <style type="text/css"><![CDATA[
+      @font-face {
+        font-family: 'NotoSansEmbedded';
+        font-weight: 400;
+        font-style: normal;
+        src: url(data:font/woff;base64,${fonts.reg}) format('woff');
+      }
+      @font-face {
+        font-family: 'NotoSansEmbedded';
+        font-weight: 700;
+        font-style: normal;
+        src: url(data:font/woff;base64,${fonts.bold}) format('woff');
+      }
+    ]]></style>
     <linearGradient id="rightFade" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#0a0707" stop-opacity="0"/>
       <stop offset="15%" stop-color="#0a0707" stop-opacity="0.7"/>

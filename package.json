@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@fontsource/noto-sans": "^5.2.10",
     "@google/genai": "^2.10.0",
     "@vercel/blob": "^2.5.0",
     "better-auth": "^1.6.22",
